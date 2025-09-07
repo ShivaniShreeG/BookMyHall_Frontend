@@ -26,7 +26,8 @@ class _BookingPageState extends State<BookingPage> {
   TimeOfDay fromTime = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay toTime = const TimeOfDay(hour: 14, minute: 0);
 
-  List<String> bookedSlots = [];
+  // store full booking ranges instead of only start times
+  List<Map<String, DateTime>> bookedRanges = [];
 
   @override
   void initState() {
@@ -39,16 +40,33 @@ class _BookingPageState extends State<BookingPage> {
     if (result['success']) {
       final data = result['data'] as List;
       final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-      final slots = data
+
+      final ranges = data
           .where((b) =>
       DateFormat('yyyy-MM-dd')
           .format(DateTime.parse(b['from_datetime'])) ==
           dateStr)
-          .map((b) => DateFormat('hh:mm a')
-          .format(DateTime.parse(b['from_datetime']).toLocal()))
+          .map((b) => {
+        "from": DateTime.parse(b['from_datetime']),
+        "to": DateTime.parse(b['to_datetime']),
+      })
           .toList();
-      setState(() => bookedSlots = slots);
+
+      setState(() => bookedRanges = ranges);
     }
+  }
+
+  /// overlap checker
+  bool _isOverlapping(DateTime newFrom, DateTime newTo) {
+    for (var slot in bookedRanges) {
+      final existingFrom = slot["from"]!;
+      final existingTo = slot["to"]!;
+      // overlap if start < existingEnd and end > existingStart
+      if (newFrom.isBefore(existingTo) && newTo.isAfter(existingFrom)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _createBooking() async {
@@ -84,13 +102,22 @@ class _BookingPageState extends State<BookingPage> {
       toTime.minute,
     );
 
-    final fromFormatted = DateFormat('hh:mm a').format(fromDateTime);
-    final toFormatted = DateFormat('hh:mm a').format(toDateTime);
-
-    if (bookedSlots.contains(fromFormatted) || bookedSlots.contains(toFormatted)) {
+    if (toDateTime.isBefore(fromDateTime) ||
+        toDateTime.isAtSameMomentAs(fromDateTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Selected time slot is already booked!"),
+          content: Text("End time must be after start time."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // check overlap with existing bookings
+    if (_isOverlapping(fromDateTime, toDateTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Selected time overlaps with an existing booking!"),
           backgroundColor: Colors.red,
         ),
       );
@@ -133,7 +160,8 @@ class _BookingPageState extends State<BookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final formattedDate = DateFormat('dd MMMM yyyy').format(widget.selectedDate);
+    final formattedDate =
+    DateFormat('dd MMMM yyyy').format(widget.selectedDate);
 
     return Scaffold(
       appBar: AppBar(
@@ -146,13 +174,13 @@ class _BookingPageState extends State<BookingPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                if (bookedSlots.isNotEmpty)
+                if (bookedRanges.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        "Already Booked Slots: ${bookedSlots.join(', ')}",
+                        "Already Booked Slots:\n${bookedRanges.map((s) => "${DateFormat('hh:mm a').format(s['from']!)} - ${DateFormat('hh:mm a').format(s['to']!)}").join(", ")}",
                         style: const TextStyle(
                             color: Colors.red, fontWeight: FontWeight.bold),
                       ),
@@ -160,57 +188,78 @@ class _BookingPageState extends State<BookingPage> {
                   ),
                 TextFormField(
                   controller: customerController,
-                  decoration: const InputDecoration(labelText: "Customer Name"),
+                  decoration:
+                  const InputDecoration(labelText: "Customer Name"),
                   validator: (value) =>
-                  value == null || value.isEmpty ? "Enter customer name" : null,
+                  value == null || value.isEmpty
+                      ? "Enter customer name"
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: "Phone Number"),
+                  decoration:
+                  const InputDecoration(labelText: "Phone Number"),
                   validator: (value) =>
-                  value == null || value.isEmpty ? "Enter phone number" : null,
+                  value == null || value.isEmpty
+                      ? "Enter phone number"
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: altPhoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: "Alternate Phone"),
+                  decoration: const InputDecoration(
+                      labelText: "Alternate Phone"),
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: "Email"),
+                  decoration:
+                  const InputDecoration(labelText: "Email"),
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: addressController,
-                  decoration: const InputDecoration(labelText: "Address"),
+                  decoration:
+                  const InputDecoration(labelText: "Address"),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: "Event Type"),
-                  items: ["Wedding", "Reception", "Engagement", "Birthday", "Meeting", "Other"]
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  items: [
+                    "Wedding",
+                    "Reception",
+                    "Engagement",
+                    "Birthday",
+                    "Meeting",
+                    "Other"
+                  ]
+                      .map((e) =>
+                      DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
                   onChanged: (value) => eventController.text = value!,
                   validator: (value) =>
-                  value == null || value.isEmpty ? "Select event type" : null,
+                  value == null || value.isEmpty
+                      ? "Select event type"
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: notesController,
-                  decoration: const InputDecoration(labelText: "Notes (optional)"),
+                  decoration: const InputDecoration(
+                      labelText: "Notes (optional)"),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: advanceController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Advance Paid (₹)"),
+                  decoration: const InputDecoration(
+                      labelText: "Advance Paid (₹)"),
                 ),
                 const SizedBox(height: 15),
                 Row(
@@ -223,11 +272,26 @@ class _BookingPageState extends State<BookingPage> {
                             initialTime: fromTime,
                           );
                           if (picked != null) {
-                            final formatted = picked.format(context);
-                            if (bookedSlots.contains(formatted)) {
+                            final newFrom = DateTime(
+                              widget.selectedDate.year,
+                              widget.selectedDate.month,
+                              widget.selectedDate.day,
+                              picked.hour,
+                              picked.minute,
+                            );
+                            final newTo = DateTime(
+                              widget.selectedDate.year,
+                              widget.selectedDate.month,
+                              widget.selectedDate.day,
+                              toTime.hour,
+                              toTime.minute,
+                            );
+
+                            if (_isOverlapping(newFrom, newTo)) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("This time is already booked!"),
+                                  content: Text(
+                                      "This start time overlaps with existing booking!"),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -254,11 +318,26 @@ class _BookingPageState extends State<BookingPage> {
                             initialTime: toTime,
                           );
                           if (picked != null) {
-                            final formatted = picked.format(context);
-                            if (bookedSlots.contains(formatted)) {
+                            final newFrom = DateTime(
+                              widget.selectedDate.year,
+                              widget.selectedDate.month,
+                              widget.selectedDate.day,
+                              fromTime.hour,
+                              fromTime.minute,
+                            );
+                            final newTo = DateTime(
+                              widget.selectedDate.year,
+                              widget.selectedDate.month,
+                              widget.selectedDate.day,
+                              picked.hour,
+                              picked.minute,
+                            );
+
+                            if (_isOverlapping(newFrom, newTo)) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("This time is already booked!"),
+                                  content: Text(
+                                      "This end time overlaps with existing booking!"),
                                   backgroundColor: Colors.red,
                                 ),
                               );
