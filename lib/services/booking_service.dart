@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // ✅ For kDebugMode
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -25,13 +26,15 @@ class BookingService {
         body: jsonEncode(bookingData),
       );
 
-      print("🌐 Create booking URL: $uri");
-      print("📩 Response body: ${response.body}");
+      if (kDebugMode) {
+        print("🌐 Create booking URL: $uri");
+        print("📩 Response body: ${response.body}");
+      }
 
       final data = jsonDecode(response.body);
       return {"success": response.statusCode == 201, "data": data};
     } catch (e) {
-      print("❌ Error creating booking: $e");
+      if (kDebugMode) print("❌ Error creating booking: $e");
       return {"success": false, "message": "Server error: $e"};
     }
   }
@@ -51,13 +54,15 @@ class BookingService {
         },
       );
 
-      print("🌐 Get bookings URL: $uri");
-      print("📩 Response body: ${response.body}");
+      if (kDebugMode) {
+        print("🌐 Get bookings URL: $uri");
+        print("📩 Response body: ${response.body}");
+      }
 
       final data = jsonDecode(response.body);
       return {"success": response.statusCode == 200, "data": data};
     } catch (e) {
-      print("❌ Error fetching bookings: $e");
+      if (kDebugMode) print("❌ Error fetching bookings: $e");
       return {"success": false, "message": "Server error: $e"};
     }
   }
@@ -80,13 +85,15 @@ class BookingService {
         body: jsonEncode(updatedData),
       );
 
-      print("🌐 Update booking URL: $uri");
-      print("📩 Response body: ${response.body}");
+      if (kDebugMode) {
+        print("🌐 Update booking URL: $uri");
+        print("📩 Response body: ${response.body}");
+      }
 
       final data = jsonDecode(response.body);
       return {"success": response.statusCode == 200, "data": data};
     } catch (e) {
-      print("❌ Error updating booking: $e");
+      if (kDebugMode) print("❌ Error updating booking: $e");
       return {"success": false, "message": "Server error: $e"};
     }
   }
@@ -106,13 +113,15 @@ class BookingService {
         },
       );
 
-      print("🌐 Cancel booking URL: $uri");
-      print("📩 Response body: ${response.body}");
+      if (kDebugMode) {
+        print("🌐 Cancel booking URL: $uri");
+        print("📩 Response body: ${response.body}");
+      }
 
       final data = jsonDecode(response.body);
       return {"success": response.statusCode == 200, "data": data};
     } catch (e) {
-      print("❌ Error cancelling booking: $e");
+      if (kDebugMode) print("❌ Error cancelling booking: $e");
       return {"success": false, "message": "Server error: $e"};
     }
   }

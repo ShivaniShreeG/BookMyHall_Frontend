@@ -2,21 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/main_navigation.dart';
 import 'screens/public/login.dart';
+import 'screens/public/profile.dart';
+import 'screens/public/home.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Draw under system bars (edge-to-edge)…
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-  // …but make them transparent and readable.
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    systemNavigationBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  ));
-
   runApp(const MyApp());
 }
 
@@ -33,12 +24,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
 
-      // Wrap ALL routes in SafeArea so content won't be hidden by system bars.
       builder: (context, child) => SafeArea(
-        top: true,
+        top: false,
         bottom: true,
-        left: true,
-        right: true,
         child: child ?? const SizedBox.shrink(),
       ),
 
@@ -46,6 +34,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const MainNavigation(),
         '/login': (context) => const LoginPage(),
+        '/profile': (context) => const ProfilePage(),
+        '/home': (context) => const HomePage(),
       },
     );
   }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import '../screens/public/login.dart';
-import '../screens/public/profile.dart';
 
 class AppDrawer extends StatefulWidget {
   final VoidCallback onLogout;
@@ -26,9 +24,11 @@ class _AppDrawerState extends State<AppDrawer> {
   /// ✅ Check login state
   Future<void> _checkLoginStatus() async {
     bool loggedIn = await AuthService.isLoggedIn();
+    if (!mounted) return; // ✅ check mounted
     if (loggedIn) {
       String? name = await AuthService.getName();
       String? role = await AuthService.getRole();
+      if (!mounted) return; // ✅ check mounted
       setState(() {
         _isLoggedIn = true;
         _name = name ?? "";
@@ -43,36 +43,61 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
-  /// ✅ Logout function
-  Future<void> _logout() async {
-    await AuthService.logout();
-    widget.onLogout();
-    setState(() {
-      _isLoggedIn = false;
-      _name = "";
-      _role = "";
-    });
-    Navigator.pop(context);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
+  /// ✅ Logout with confirmation
+  Future<void> _confirmLogout() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // must choose option
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Logout"),
+          content: const Text("Do you really want to logout?"),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              child: const Text("Logout", style: TextStyle(color: Colors.red)),
+              onPressed: () async {
+                // Capture navigator before async gaps
+                final navigator = Navigator.of(context);
+                navigator.pop(); // close dialog
+
+                await AuthService.logout();
+                widget.onLogout();
+
+                if (!mounted) return; // ✅ check mounted
+
+                setState(() {
+                  _isLoggedIn = false;
+                  _name = "";
+                  _role = "";
+                });
+
+                navigator.pop(); // close drawer
+
+                navigator.pushNamedAndRemoveUntil('/', (route) => false);
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
   /// ✅ Navigate to profile page
   void _navigateProfile() {
-    Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ProfilePage()),
-    );
+    final navigator = Navigator.of(context);
+    navigator.pop(); // close drawer
+    navigator.pushNamed('/profile');
   }
 
   /// ✅ Single default avatar
   Widget _buildAvatar() {
     return ClipOval(
       child: Image.asset(
-        'assets/images/profile_avatar.png', // ✅ Default profile avatar
+        'assets/images/profile_avatar.png', // Default profile avatar
         width: 80,
         height: 80,
         fit: BoxFit.cover,
@@ -140,11 +165,10 @@ class _AppDrawerState extends State<AppDrawer> {
                       style: TextStyle(fontSize: 16),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
-                      ).then((_) => _checkLoginStatus());
+                      final navigator = Navigator.of(context);
+                      navigator.pop(); // close drawer
+                      navigator.pushNamed('/login')
+                          .then((_) => _checkLoginStatus());
                     },
                   )
                 else ...[
@@ -159,14 +183,13 @@ class _AppDrawerState extends State<AppDrawer> {
                   ),
                   const Divider(thickness: 1, indent: 16, endIndent: 16),
                   ListTile(
-                    leading:
-                    const Icon(Icons.logout, color: Colors.redAccent),
+                    leading: const Icon(Icons.logout, color: Colors.redAccent),
                     title: const Text(
                       "Logout",
                       style: TextStyle(fontSize: 16),
                     ),
                     subtitle: const Text("Sign out from the app"),
-                    onTap: _logout,
+                    onTap: _confirmLogout,
                   ),
                 ],
               ],
@@ -177,7 +200,7 @@ class _AppDrawerState extends State<AppDrawer> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              "© 2025 Marriage Hall Booking",
+              "© BookMyHall",
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontSize: 12,

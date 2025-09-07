@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // ✅ For kDebugMode
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart'; // <-- Import base URL
@@ -11,7 +12,10 @@ class AuthService {
       String email, String password, String role) async {
     try {
       final uri = Uri.parse("$baseUrl/login");
-      print("🌐 Sending login request to $uri with email=$email, role=$role");
+
+      if (kDebugMode) {
+        print("🌐 Sending login request to $uri with email=$email, role=$role");
+      }
 
       final response = await http.post(
         uri,
@@ -23,8 +27,10 @@ class AuthService {
         }),
       );
 
-      print("📩 Response status: ${response.statusCode}");
-      print("📩 Response body: ${response.body}");
+      if (kDebugMode) {
+        print("📩 Response status: ${response.statusCode}");
+        print("📩 Response body: ${response.body}");
+      }
 
       final data = jsonDecode(response.body);
 
@@ -33,7 +39,7 @@ class AuthService {
 
         // ✅ Save token and user details in SharedPreferences
         await prefs.setString("token", data['token']);
-        await prefs.setString("userId", data['user']['id'].toString()); // <-- FIXED
+        await prefs.setString("userId", data['user']['id'].toString());
         await prefs.setString("name", data['user']['name']);
         await prefs.setString("email", data['user']['email']);
         await prefs.setString("phone", data['user']['phone'] ?? "");
@@ -52,7 +58,7 @@ class AuthService {
         };
       }
     } catch (e) {
-      print("❌ Exception during login: $e");
+      if (kDebugMode) print("❌ Exception during login: $e");
       return {"success": false, "message": "Server error: $e"};
     }
   }

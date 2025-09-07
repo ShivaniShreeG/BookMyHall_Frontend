@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../main_navigation.dart'; // import your MainNavigation
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,25 +28,26 @@ class _LoginPageState extends State<LoginPage> {
         _role,
       );
 
-      print(response); // Debugging
+      if (kDebugMode) {
+        print(response);
+      }
+
+      if (!mounted) return;
 
       if (response['success'] == true && response['token'] != null) {
-        // Navigate to MainNavigation
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response['message'] ?? 'Login failed')),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Something went wrong: $e')),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -55,13 +56,17 @@ class _LoginPageState extends State<LoginPage> {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
+    // Replace onBackground with onSurface and use withAlpha for opacity
+    final titleColor = theme.colorScheme.onSurface;
+    final subtitleColor = theme.colorScheme.onSurface.withAlpha((0.6 * 255).round());
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Login'),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context), // Go back button
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
@@ -70,18 +75,14 @@ class _LoginPageState extends State<LoginPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(height: size.height * 0.05),
-            Icon(
-              Icons.lock_outline,
-              size: 80,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.lock_outline, size: 80, color: theme.colorScheme.primary),
             const SizedBox(height: 16),
             Text(
               "Welcome Back!",
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onBackground,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -89,7 +90,7 @@ class _LoginPageState extends State<LoginPage> {
               "Login to your account",
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onBackground.withOpacity(0.6),
+                color: subtitleColor,
               ),
             ),
             const SizedBox(height: 32),
@@ -124,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _role,
+                    initialValue: _role,
                     decoration: InputDecoration(
                       labelText: "Role",
                       prefixIcon: const Icon(Icons.person_outline),
@@ -137,9 +138,7 @@ class _LoginPageState extends State<LoginPage> {
                       DropdownMenuItem(value: "manager", child: Text("Manager")),
                     ],
                     onChanged: (value) {
-                      setState(() {
-                        _role = value!;
-                      });
+                      setState(() => _role = value!);
                     },
                   ),
                   const SizedBox(height: 24),
@@ -154,9 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                         textStyle: const TextStyle(fontSize: 18),
                       ),
                       child: _isLoading
-                          ? const CircularProgressIndicator(
-                        color: Colors.white,
-                      )
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : const Text("Login"),
                     ),
                   ),

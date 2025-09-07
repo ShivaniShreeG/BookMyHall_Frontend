@@ -33,8 +33,8 @@ dependencies:
     # For REST API calls (to connect Flutter with Node.js backend)
   http: ^1.2.1
   table_calendar: ^3.0.9
-
-    # For managing tokens & saving login sessions locally (optional but recommended)
+  intl: ^0.18.1
+  # For managing tokens & saving login sessions locally (optional but recommended)
   shared_preferences: ^2.2.3
 
     # For icons & UI improvements
