@@ -84,7 +84,8 @@ class _HomePageState extends State<HomePage> {
 
           final DateTime slotEnd = isEndDay
               ? toDateTime
-              : DateTime(currentDay.year, currentDay.month, currentDay.day, 23, 59, 59);
+              : DateTime(
+              currentDay.year, currentDay.month, currentDay.day, 23, 59, 59);
 
           tempDetailed[dateKey] ??= [];
           tempDetailed[dateKey]!.add({'start': slotStart, 'end': slotEnd});
@@ -135,6 +136,40 @@ class _HomePageState extends State<HomePage> {
     final fullDayBooked = slots.any(
             (s) => s.startsWith("12:00 AM") && s.endsWith("11:59 PM") ||
             s.startsWith("00:00") && s.endsWith("23:59"));
+
+    // ✅ New logic: Merge multiple slot ranges to see if the whole day is covered
+    if (!fullDayBooked && slots.isNotEmpty) {
+      final ranges = slots.map((s) {
+        final parts = s.split(" - ");
+        return {
+          "start": DateFormat("hh:mm a").parse(parts[0]),
+          "end": DateFormat("hh:mm a").parse(parts[1]),
+        };
+      }).toList();
+
+      ranges.sort((a, b) => a["start"]!.compareTo(b["start"]!));
+
+      final startOfDay = DateFormat("hh:mm a").parse("12:00 AM");
+      final endOfDay = DateFormat("hh:mm a").parse("11:59 PM");
+
+      DateTime coveredUntil = ranges.first["start"]!;
+      if (coveredUntil.isAfter(startOfDay)) {
+        // There's a gap at the start
+      } else {
+        coveredUntil = ranges.first["end"]!;
+        for (var r in ranges.skip(1)) {
+          if (r["start"]!.isAfter(coveredUntil)) {
+            break; // gap found
+          }
+          if (r["end"]!.isAfter(coveredUntil)) {
+            coveredUntil = r["end"]!;
+          }
+        }
+        if (!coveredUntil.isBefore(endOfDay)) {
+          return Colors.red; // fully covered with multiple slots
+        }
+      }
+    }
 
     if (fullDayBooked) return Colors.red;
     if (slots.isEmpty) return Colors.green;
@@ -197,7 +232,8 @@ class _HomePageState extends State<HomePage> {
                       backgroundColor: Colors.orange,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
                     ),
                     child: const Text(
                       "Login",
@@ -227,11 +263,14 @@ class _HomePageState extends State<HomePage> {
               Text(
                 slots.isEmpty ? "No Bookings Yet" : "Booked Slots",
                 style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange),
               ),
               const SizedBox(height: 10),
               if (slots.isEmpty)
-                const Text("This date is free!", style: TextStyle(fontSize: 16))
+                const Text("This date is free!",
+                    style: TextStyle(fontSize: 16))
               else
                 for (var timeRange in slots)
                   Padding(
@@ -253,11 +292,13 @@ class _HomePageState extends State<HomePage> {
                   ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      if (isLoggedIn && (userRole == "manager" || userRole == "admin")) {
+                      if (isLoggedIn &&
+                          (userRole == "manager" || userRole == "admin")) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BookingPage(selectedDate: selectedDay),
+                            builder: (context) =>
+                                BookingPage(selectedDate: selectedDay),
                           ),
                         ).then((result) {
                           if (result == true) fetchBookings();
@@ -268,7 +309,8 @@ class _HomePageState extends State<HomePage> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text("Book Now"),
                   ),
@@ -330,11 +372,14 @@ class _HomePageState extends State<HomePage> {
                   firstDay: DateTime.utc(2020, 1, 1),
                   lastDay: DateTime.utc(2100, 12, 31),
                   focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  selectedDayPredicate: (day) =>
+                      isSameDay(_selectedDay, day),
                   enabledDayPredicate: (day) => !day.isBefore(today),
                   onDaySelected: _onDaySelected,
                   calendarFormat: CalendarFormat.month,
-                  availableCalendarFormats: const {CalendarFormat.month: 'Month'},
+                  availableCalendarFormats: const {
+                    CalendarFormat.month: 'Month'
+                  },
                   calendarBuilders: CalendarBuilders(
                     defaultBuilder: (context, day, focusedDay) {
                       if (day.isBefore(today)) {
@@ -352,33 +397,46 @@ class _HomePageState extends State<HomePage> {
                           color: color,
                           shape: BoxShape.circle,
                           boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(1, 2))
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 3,
+                                offset: Offset(1, 2))
                           ],
                         ),
                         child: Center(
                           child: Text(
                             "${day.day}",
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       );
                     },
                     todayBuilder: (context, day, focusedDay) {
-                      final color = isSameDay(_selectedDay, day) ? Colors.blue : _getDayColor(day);
+                      final color = isSameDay(_selectedDay, day)
+                          ? Colors.blue
+                          : _getDayColor(day);
                       return Container(
                         margin: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: color,
-                          border: Border.all(color: Colors.black26, width: 2),
+                          border: Border.all(
+                              color: Colors.black26, width: 2),
                           shape: BoxShape.circle,
                           boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(1, 2))
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 3,
+                                offset: Offset(1, 2))
                           ],
                         ),
                         child: Center(
                           child: Text(
                             "${day.day}",
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       );
@@ -424,11 +482,16 @@ class _HomePageState extends State<HomePage> {
             color: color,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.black12, width: 1),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(1, 1))],
+            boxShadow: const [
+              BoxShadow(
+                  color: Colors.black12, blurRadius: 2, offset: Offset(1, 1))
+            ],
           ),
         ),
         const SizedBox(width: 8),
-        Text(text, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        Text(text,
+            style: const TextStyle(
+                color: Colors.black, fontWeight: FontWeight.bold)),
       ],
     );
   }
