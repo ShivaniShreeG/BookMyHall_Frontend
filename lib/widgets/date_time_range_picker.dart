@@ -13,24 +13,32 @@ class DateTimeRangePicker {
     TimeOfDay? tempStartTime;
     TimeOfDay? tempEndTime;
 
-    // 🔹 Helper: check overlaps
-    String? checkOverlap(
-        DateTime candidateFrom, DateTime candidateTo, List<Map<String, DateTime>> bookedRanges) {
-      for (var slot in bookedRanges) {
-        final existingFrom = slot['from']!;
-        final existingTo = slot['to']!;
+    // ✅ Modified: supports multiple conflicts & UTC-safe
+    List<String> checkOverlap(
+        DateTime candidateFrom,
+        DateTime candidateTo,
+        List<Map<String, DateTime>> bookedRanges) {
+      final formatter = DateFormat('dd MMM yyyy, hh:mm a');
+      List<String> conflicts = [];
 
-        // Overlap if not completely outside
-        final hasOverlap = candidateFrom.isBefore(existingTo) &&
-            candidateTo.isAfter(existingFrom);
+      for (var slot in bookedRanges) {
+        final existingFrom = slot['from']!.isUtc
+            ? slot['from']!.toLocal()
+            : slot['from']!;
+        final existingTo = slot['to']!.isUtc
+            ? slot['to']!.toLocal()
+            : slot['to']!;
+
+        final hasOverlap =
+            candidateFrom.isBefore(existingTo) && candidateTo.isAfter(existingFrom);
 
         if (hasOverlap) {
-          final formatter = DateFormat('dd MMM yyyy, hh:mm a');
-          return "Conflicts with existing booking:\n"
-              "${formatter.format(existingFrom)} → ${formatter.format(existingTo)}";
+          conflicts.add(
+              "${formatter.format(existingFrom)} → ${formatter.format(existingTo)}");
         }
       }
-      return null;
+
+      return conflicts;
     }
 
     return await showDialog<Map<String, DateTime>>(
@@ -75,12 +83,15 @@ class DateTimeRangePicker {
               }
 
               // 🔹 Check overlaps with message
-              final overlapMessage = checkOverlap(candidateFrom, candidateTo, bookedRanges);
-              if (overlapMessage != null) {
+              final conflicts = checkOverlap(candidateFrom, candidateTo, bookedRanges);
+              if (conflicts.isNotEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(overlapMessage),
+                    content: Text(
+                      "Conflicts with existing bookings:\n" + conflicts.join("\n"),
+                    ),
                     backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
                   ),
                 );
                 return;

@@ -8,6 +8,7 @@ import 'public/gallery.dart';
 import 'public/facilities.dart';
 import 'public/contact.dart';
 import 'admin/admin_dashboard.dart';
+import 'admin/admin_booking_history_page.dart';
 import 'manager/manager_dashboard.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -41,7 +42,7 @@ class _MainNavigationState extends State<MainNavigation> {
       return const [
         HomePage(),
         AdminDashboard(),
-        Center(child: Text("Managers Page Coming Soon")),
+        AdminBookingHistoryPage(),
       ];
     } else if (_role == 'manager') {
       return const [
