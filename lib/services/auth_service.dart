@@ -7,14 +7,14 @@ import '../config.dart'; // <-- Import base URL
 class AuthService {
   static const String baseUrl = "${AppConfig.baseUrl}/auth";
 
-  /// Login method
+  /// Login method (now requires hall_id)
   static Future<Map<String, dynamic>> login(
-      String email, String password, String role) async {
+      String email, String password, String role, int hallId) async {
     try {
       final uri = Uri.parse("$baseUrl/login");
 
       if (kDebugMode) {
-        print("🌐 Sending login request to $uri with email=$email, role=$role");
+        print("🌐 Sending login request to $uri with email=$email, role=$role, hallId=$hallId");
       }
 
       final response = await http.post(
@@ -24,6 +24,7 @@ class AuthService {
           "email": email,
           "password": password,
           "role": role,
+          "hall_id": hallId,   // ✅ Send hall_id
         }),
       );
 
@@ -44,6 +45,7 @@ class AuthService {
         await prefs.setString("email", data['user']['email']);
         await prefs.setString("phone", data['user']['phone'] ?? "");
         await prefs.setString("role", data['user']['role']);
+        await prefs.setInt("hall_id", data['user']['hall_id']); // ✅ Save as int
         await prefs.setBool("isLoggedIn", true);
 
         return {
@@ -99,5 +101,10 @@ class AuthService {
   static Future<String?> getPhone() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString("phone");
+  }
+
+  static Future<int?> getHallId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt("hall_id"); // ✅ Read as int
   }
 }

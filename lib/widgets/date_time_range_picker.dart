@@ -46,7 +46,7 @@ class DateTimeRangePicker {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            Future<void> _confirm() async {
+            Future<void> confirm() async {
               if (tempStartTime == null || tempEndTime == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -88,7 +88,7 @@ class DateTimeRangePicker {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      "Conflicts with existing bookings:\n" + conflicts.join("\n"),
+                      "Conflicts with existing bookings:\n${conflicts.join("\n")}",
                     ),
                     backgroundColor: Colors.red,
                     duration: const Duration(seconds: 5),
@@ -197,7 +197,7 @@ class DateTimeRangePicker {
                   child: const Text("Cancel"),
                 ),
                 ElevatedButton(
-                  onPressed: _confirm,
+                  onPressed: confirm,
                   child: const Text("Confirm"),
                 ),
               ],

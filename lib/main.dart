@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Marriage Hall Booking',
+      title: 'BookMyHall',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

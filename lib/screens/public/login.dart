@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
+import '../../config.dart';
+import '../../screens/main_navigation.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,10 +18,44 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String _role = 'admin'; // Default role
+  int? _selectedHallId;
   bool _isLoading = false;
+  List<Map<String, dynamic>> _halls = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHalls();
+  }
+
+  /// 🔹 Fetch halls from backend
+  Future<void> _fetchHalls() async {
+    try {
+      final uri = Uri.parse("${AppConfig.baseUrl}/halls");
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _halls = data.cast<Map<String, dynamic>>();
+        });
+      } else {
+        if (kDebugMode) {
+          print("❌ Failed to load halls: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print("❌ Exception while fetching halls: $e");
+    }
+  }
 
   void _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedHallId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a hall")),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -26,16 +64,21 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text,
         _passwordController.text,
         _role,
+        _selectedHallId!, // ✅ pass hallId
       );
 
       if (kDebugMode) {
-        print(response);
+        print("🔑 Login response: $response");
       }
 
       if (!mounted) return;
 
       if (response['success'] == true && response['token'] != null) {
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response['message'] ?? 'Login failed')),
@@ -56,7 +99,6 @@ class _LoginPageState extends State<LoginPage> {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
-    // Replace onBackground with onSurface and use withAlpha for opacity
     final titleColor = theme.colorScheme.onSurface;
     final subtitleColor = theme.colorScheme.onSurface.withAlpha((0.6 * 255).round());
 
@@ -141,6 +183,28 @@ class _LoginPageState extends State<LoginPage> {
                       setState(() => _role = value!);
                     },
                   ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    initialValue: _selectedHallId,
+                    decoration: InputDecoration(
+                      labelText: "Select Hall",
+                      prefixIcon: const Icon(Icons.apartment),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: _halls
+                        .map((hall) => DropdownMenuItem<int>(
+                      value: hall['hall_id'],
+                      child: Text(hall['name']),
+                    ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedHallId = value);
+                    },
+                    validator: (value) =>
+                    value == null ? "Please select a hall" : null,
+                  ),
                   const SizedBox(height: 24),
                   SizedBox(
                     height: 50,
@@ -156,12 +220,6 @@ class _LoginPageState extends State<LoginPage> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text("Login"),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text("Go Back"),
                   ),
                 ],
               ),

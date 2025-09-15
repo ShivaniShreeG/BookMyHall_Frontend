@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../screens/public/hall_selection_page.dart'; // ✅ import directly
 
 class AppDrawer extends StatefulWidget {
   final VoidCallback onLogout;
@@ -21,14 +22,13 @@ class _AppDrawerState extends State<AppDrawer> {
     _checkLoginStatus();
   }
 
-  /// ✅ Check login state
   Future<void> _checkLoginStatus() async {
     bool loggedIn = await AuthService.isLoggedIn();
-    if (!mounted) return; // ✅ check mounted
+    if (!mounted) return;
     if (loggedIn) {
       String? name = await AuthService.getName();
       String? role = await AuthService.getRole();
-      if (!mounted) return; // ✅ check mounted
+      if (!mounted) return;
       setState(() {
         _isLoggedIn = true;
         _name = name ?? "";
@@ -43,11 +43,10 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
-  /// ✅ Logout with confirmation
   Future<void> _confirmLogout() async {
     showDialog(
       context: context,
-      barrierDismissible: false, // must choose option
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text("Logout"),
@@ -60,14 +59,13 @@ class _AppDrawerState extends State<AppDrawer> {
             TextButton(
               child: const Text("Logout", style: TextStyle(color: Colors.red)),
               onPressed: () async {
-                // Capture navigator before async gaps
                 final navigator = Navigator.of(context);
-                navigator.pop(); // close dialog
+                navigator.pop();
 
                 await AuthService.logout();
                 widget.onLogout();
 
-                if (!mounted) return; // ✅ check mounted
+                if (!mounted) return;
 
                 setState(() {
                   _isLoggedIn = false;
@@ -75,8 +73,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   _role = "";
                 });
 
-                navigator.pop(); // close drawer
-
+                navigator.pop();
                 navigator.pushNamedAndRemoveUntil('/', (route) => false);
               },
             ),
@@ -86,18 +83,16 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  /// ✅ Navigate to profile page
   void _navigateProfile() {
     final navigator = Navigator.of(context);
-    navigator.pop(); // close drawer
+    navigator.pop();
     navigator.pushNamed('/profile');
   }
 
-  /// ✅ Single default avatar
   Widget _buildAvatar() {
     return ClipOval(
       child: Image.asset(
-        'assets/images/profile_avatar.png', // Default profile avatar
+        'assets/images/profile_avatar.png',
         width: 80,
         height: 80,
         fit: BoxFit.cover,
@@ -110,7 +105,6 @@ class _AppDrawerState extends State<AppDrawer> {
     return Drawer(
       child: Column(
         children: [
-          // ✅ Custom header with centered content
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -151,13 +145,11 @@ class _AppDrawerState extends State<AppDrawer> {
               ],
             ),
           ),
-
-          // ✅ Drawer items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                if (!_isLoggedIn)
+                if (!_isLoggedIn) ...[
                   ListTile(
                     leading: const Icon(Icons.login, color: Colors.blue),
                     title: const Text(
@@ -166,12 +158,30 @@ class _AppDrawerState extends State<AppDrawer> {
                     ),
                     onTap: () {
                       final navigator = Navigator.of(context);
-                      navigator.pop(); // close drawer
+                      navigator.pop();
                       navigator.pushNamed('/login')
                           .then((_) => _checkLoginStatus());
                     },
-                  )
-                else ...[
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.apartment, color: Colors.blue),
+                    title: const Text(
+                      "Select Hall",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    subtitle: const Text("Choose a hall to continue"),
+                    onTap: () {
+                      final navigator = Navigator.of(context);
+                      navigator.pop();
+                      navigator.push(
+                        MaterialPageRoute(
+                          builder: (_) => const HallSelectionPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                if (_isLoggedIn) ...[
                   ListTile(
                     leading: const Icon(Icons.person, color: Colors.blue),
                     title: const Text(
@@ -195,8 +205,6 @@ class _AppDrawerState extends State<AppDrawer> {
               ],
             ),
           ),
-
-          // ✅ Footer
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(

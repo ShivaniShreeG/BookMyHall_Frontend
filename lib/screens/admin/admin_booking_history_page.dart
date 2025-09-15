@@ -4,7 +4,7 @@ import '../../services/booking_service.dart';
 import 'admin_booking_details_page.dart';
 
 class AdminBookingHistoryPage extends StatefulWidget {
-  const AdminBookingHistoryPage({Key? key}) : super(key: key);
+  const AdminBookingHistoryPage({super.key});
 
   @override
   State<AdminBookingHistoryPage> createState() => _AdminBookingHistoryPageState();

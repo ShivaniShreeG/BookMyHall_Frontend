@@ -7,6 +7,7 @@ import 'public/home.dart';
 import 'public/gallery.dart';
 import 'public/facilities.dart';
 import 'public/contact.dart';
+import 'public/hall_selection_page.dart'; // Hall selection page
 import 'admin/admin_dashboard.dart';
 import 'admin/admin_booking_history_page.dart';
 import 'manager/manager_dashboard.dart';
@@ -22,6 +23,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
   String _role = '';
   bool _isLoggedIn = false;
+  int? _selectedHallId;
 
   @override
   void initState() {
@@ -31,13 +33,40 @@ class _MainNavigationState extends State<MainNavigation> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final selectedHallId = prefs.getInt('hall_id'); // ✅ fixed key to match AuthService
+
     setState(() {
       _role = prefs.getString('role') ?? '';
-      _isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+      _isLoggedIn = isLoggedIn;
+      _selectedHallId = selectedHallId;
     });
+
+    // Redirect to hall selection if hall not selected
+    if (selectedHallId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HallSelectionPage()),
+        );
+      });
+    }
   }
 
   List<Widget> _getPages() {
+    // If hall not selected, show a placeholder
+    if (_selectedHallId == null) {
+      return [
+        const Center(
+          child: Text(
+            "Please select a hall first",
+            style: TextStyle(fontSize: 18),
+          ),
+        )
+      ];
+    }
+
+    // Logged-in users
     if (_role == 'admin') {
       return const [
         HomePage(),
@@ -51,6 +80,7 @@ class _MainNavigationState extends State<MainNavigation> {
         Center(child: Text("Booking Details Coming Soon")),
       ];
     } else {
+      // Guest or regular user
       return const [
         HomePage(),
         GalleryPage(),
@@ -72,8 +102,17 @@ class _MainNavigationState extends State<MainNavigation> {
     setState(() {
       _role = '';
       _isLoggedIn = false;
+      _selectedHallId = null;
       _selectedIndex = 0;
     });
+
+    // Redirect to hall selection page after logout
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HallSelectionPage()),
+      );
+    }
   }
 
   @override
@@ -85,14 +124,11 @@ class _MainNavigationState extends State<MainNavigation> {
         title: const Text("Marriage Hall Booking"),
         centerTitle: true,
       ),
-      drawer: AppDrawer(
-        onLogout: _handleLogout,
-      ),
+      drawer: (_selectedHallId != null) ? AppDrawer(onLogout: _handleLogout) : null,
       body: pages[_selectedIndex],
-      bottomNavigationBar: BottomNavBar(
-        onTabSelected: _onTabSelected,
-        selectedIndex: _selectedIndex,
-      ),
+      bottomNavigationBar: (_selectedHallId != null)
+          ? BottomNavBar(onTabSelected: _onTabSelected, selectedIndex: _selectedIndex)
+          : null,
     );
   }
 }

@@ -5,8 +5,7 @@ import '../../services/booking_service.dart';
 class AdminBookingDetailsPage extends StatefulWidget {
   final int bookingId;
 
-  const AdminBookingDetailsPage({Key? key, required this.bookingId})
-      : super(key: key);
+  const AdminBookingDetailsPage({super.key, required this.bookingId});
 
   @override
   State<AdminBookingDetailsPage> createState() => _AdminBookingDetailsPageState();

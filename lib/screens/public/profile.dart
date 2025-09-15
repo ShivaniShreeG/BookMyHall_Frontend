@@ -13,11 +13,31 @@ class _ProfilePageState extends State<ProfilePage> {
   String _email = '';
   String _phone = '';
   String _role = '';
+  bool _loading = true;
+  bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _checkLoginStatus();
+  }
+
+  /// ✅ Check if user is logged in
+  Future<void> _checkLoginStatus() async {
+    final loggedIn = await AuthService.isLoggedIn(); // implement in AuthService
+    if (!loggedIn) {
+      Future.microtask(() {
+        Navigator.of(context).pushReplacementNamed('/login');
+      });
+    } else {
+      setState(() {
+        _isLoggedIn = true;
+      });
+      await _loadUserData();
+    }
+    setState(() {
+      _loading = false;
+    });
   }
 
   /// ✅ Load user data from AuthService
@@ -68,6 +88,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_isLoggedIn) {
+      // While redirecting, show empty scaffold
+      return const Scaffold(body: SizedBox.shrink());
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -86,7 +117,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 backgroundColor: Colors.blue.shade100,
                 child: ClipOval(
                   child: Image.asset(
-                    'assets/images/profile_avatar.png', // ✅ Default avatar
+                    'assets/images/profile_avatar.png', // default avatar
                     width: 110,
                     height: 110,
                     fit: BoxFit.cover,

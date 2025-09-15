@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import '../../services/auth_service.dart';
 import '../../services/booking_service.dart';
 import 'booking_page.dart';
 
@@ -16,7 +17,6 @@ class _HomePageState extends State<HomePage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  // Map date (yyyy-MM-dd) -> list of time ranges (formatted strings)
   Map<String, List<String>> bookedDates = {};
   bool isLoading = true;
   bool isLoggedIn = false;
@@ -40,32 +40,39 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// Fetch bookings and expand multi-day bookings so each date between
-  /// from_datetime and to_datetime gets an appropriate time-range string.
   Future<void> fetchBookings() async {
     if (!mounted) return;
     setState(() => isLoading = true);
-    final result = await BookingService.getBookings();
 
+    final prefs = await SharedPreferences.getInstance();
+    int? hallId;
+
+    // ✅ Always load from the same key
+    hallId = prefs.getInt("hall_id");
+
+    if (hallId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No hall selected. Please select a hall.")),
+        );
+      }
+      setState(() => isLoading = false);
+      return;
+    }
+
+    final result = await BookingService.getBookings(hallId);
     if (!mounted) return;
 
     if (result['success']) {
       final data = result['data'] as List;
-
-      // temporary detailed map: date -> list of maps { 'start': DateTime, 'end': DateTime }
       final Map<String, List<Map<String, DateTime>>> tempDetailed = {};
 
       for (var booking in data) {
-        // Convert backend UTC to local (IST) to match database time
-        final DateTime fromDateTime =
-        DateTime.parse(booking['from_datetime']).toLocal();
-        final DateTime toDateTime =
-        DateTime.parse(booking['to_datetime']).toLocal();
+        final DateTime fromDateTime = DateTime.parse(booking['from_datetime']).toLocal();
+        final DateTime toDateTime = DateTime.parse(booking['to_datetime']).toLocal();
 
-        DateTime currentDay =
-        DateTime(fromDateTime.year, fromDateTime.month, fromDateTime.day);
-        final DateTime lastDay =
-        DateTime(toDateTime.year, toDateTime.month, toDateTime.day);
+        DateTime currentDay = DateTime(fromDateTime.year, fromDateTime.month, fromDateTime.day);
+        final DateTime lastDay = DateTime(toDateTime.year, toDateTime.month, toDateTime.day);
 
         while (!currentDay.isAfter(lastDay)) {
           final dateKey = DateFormat('yyyy-MM-dd').format(currentDay);
@@ -84,8 +91,7 @@ class _HomePageState extends State<HomePage> {
 
           final DateTime slotEnd = isEndDay
               ? toDateTime
-              : DateTime(
-              currentDay.year, currentDay.month, currentDay.day, 23, 59, 59);
+              : DateTime(currentDay.year, currentDay.month, currentDay.day, 23, 59, 59);
 
           tempDetailed[dateKey] ??= [];
           tempDetailed[dateKey]!.add({'start': slotStart, 'end': slotEnd});
@@ -94,9 +100,8 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      // convert detailed map to final formatted & sorted string map
       final Map<String, List<String>> temp = {};
-      final timeFmt = DateFormat('hh:mm a'); // 12-hour format
+      final timeFmt = DateFormat('hh:mm a');
 
       for (var entry in tempDetailed.entries) {
         entry.value.sort((a, b) => a['start']!.compareTo(b['start']!));
@@ -117,11 +122,11 @@ class _HomePageState extends State<HomePage> {
 
       setState(() => bookedDates = temp);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? "Failed to fetch bookings"),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? "Failed to fetch bookings")),
+        );
+      }
     }
 
     if (mounted) setState(() => isLoading = false);
@@ -129,51 +134,9 @@ class _HomePageState extends State<HomePage> {
 
   Color _getDayColor(DateTime day) {
     final dateStr = DateFormat('yyyy-MM-dd').format(day);
-    if (!bookedDates.containsKey(dateStr)) return Colors.green;
-    final slots = bookedDates[dateStr]!;
-
-    // If the full day (00:00 to 23:59) is booked, mark fully booked
-    final fullDayBooked = slots.any(
-            (s) => s.startsWith("12:00 AM") && s.endsWith("11:59 PM") ||
-            s.startsWith("00:00") && s.endsWith("23:59"));
-
-    // ✅ New logic: Merge multiple slot ranges to see if the whole day is covered
-    if (!fullDayBooked && slots.isNotEmpty) {
-      final ranges = slots.map((s) {
-        final parts = s.split(" - ");
-        return {
-          "start": DateFormat("hh:mm a").parse(parts[0]),
-          "end": DateFormat("hh:mm a").parse(parts[1]),
-        };
-      }).toList();
-
-      ranges.sort((a, b) => a["start"]!.compareTo(b["start"]!));
-
-      final startOfDay = DateFormat("hh:mm a").parse("12:00 AM");
-      final endOfDay = DateFormat("hh:mm a").parse("11:59 PM");
-
-      DateTime coveredUntil = ranges.first["start"]!;
-      if (coveredUntil.isAfter(startOfDay)) {
-        // There's a gap at the start
-      } else {
-        coveredUntil = ranges.first["end"]!;
-        for (var r in ranges.skip(1)) {
-          if (r["start"]!.isAfter(coveredUntil)) {
-            break; // gap found
-          }
-          if (r["end"]!.isAfter(coveredUntil)) {
-            coveredUntil = r["end"]!;
-          }
-        }
-        if (!coveredUntil.isBefore(endOfDay)) {
-          return Colors.red; // fully covered with multiple slots
-        }
-      }
+    if (!bookedDates.containsKey(dateStr) || bookedDates[dateStr]!.isEmpty) {
+      return Colors.green;
     }
-
-    if (fullDayBooked) return Colors.red;
-    if (slots.isEmpty) return Colors.green;
-    if (slots.length < totalSlots) return Colors.orange;
     return Colors.red;
   }
 
@@ -204,10 +167,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               const Text(
                 "To book the hall, please contact the manager.\nIf you are a manager, please login.",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black87,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.black87),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -235,10 +195,8 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 24, vertical: 12),
                     ),
-                    child: const Text(
-                      "Login",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
+                    child: const Text("Login",
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
                   ),
                 ],
               ),
@@ -263,31 +221,25 @@ class _HomePageState extends State<HomePage> {
               Text(
                 slots.isEmpty ? "No Bookings Yet" : "Booked Slots",
                 style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange),
+                    fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange),
               ),
               const SizedBox(height: 10),
               if (slots.isEmpty)
-                const Text("This date is free!",
-                    style: TextStyle(fontSize: 16))
+                const Text("This date is free!", style: TextStyle(fontSize: 16))
               else
                 for (var timeRange in slots)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      "• $timeRange",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    child: Text("• $timeRange",
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancel"),
-                  ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel")),
                   const SizedBox(width: 10),
                   ElevatedButton(
                     onPressed: () {
@@ -355,118 +307,111 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-          children: [
-            const SizedBox(height: 16),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: TableCalendar(
-                  firstDay: DateTime.utc(2020, 1, 1),
-                  lastDay: DateTime.utc(2100, 12, 31),
-                  focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) =>
-                      isSameDay(_selectedDay, day),
-                  enabledDayPredicate: (day) => !day.isBefore(today),
-                  onDaySelected: _onDaySelected,
-                  calendarFormat: CalendarFormat.month,
-                  availableCalendarFormats: const {
-                    CalendarFormat.month: 'Month'
-                  },
-                  calendarBuilders: CalendarBuilders(
-                    defaultBuilder: (context, day, focusedDay) {
-                      if (day.isBefore(today)) {
-                        return Center(
-                          child: Text(
-                            "${day.day}",
-                            style: TextStyle(color: Colors.grey[400]),
-                          ),
-                        );
-                      }
-                      final color = _getDayColor(day);
-                      return Container(
-                        margin: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          boxShadow: const [
-                            BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 3,
-                                offset: Offset(1, 2))
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            "${day.day}",
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      );
-                    },
-                    todayBuilder: (context, day, focusedDay) {
-                      final color = isSameDay(_selectedDay, day)
-                          ? Colors.blue
-                          : _getDayColor(day);
-                      return Container(
-                        margin: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: color,
-                          border: Border.all(
-                              color: Colors.black26, width: 2),
-                          shape: BoxShape.circle,
-                          boxShadow: const [
-                            BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 3,
-                                offset: Offset(1, 2))
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            "${day.day}",
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      );
-                    },
+        child: RefreshIndicator(
+          onRefresh: fetchBookings,
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: TableCalendar(
+                      firstDay: DateTime.utc(2020, 1, 1),
+                      lastDay: DateTime.utc(2100, 12, 31),
+                      focusedDay: _focusedDay,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDay, day),
+                      enabledDayPredicate: (day) => !day.isBefore(today),
+                      onDaySelected: _onDaySelected,
+                      calendarFormat: CalendarFormat.month,
+                      availableCalendarFormats: const {
+                        CalendarFormat.month: 'Month'
+                      },
+                      calendarBuilders: CalendarBuilders(
+                        defaultBuilder: (context, day, focusedDay) {
+                          if (day.isBefore(today)) {
+                            return Center(
+                              child: Text("${day.day}",
+                                  style:
+                                  TextStyle(color: Colors.grey[400])),
+                            );
+                          }
+                          final color = _getDayColor(day);
+                          return Container(
+                            margin: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 3,
+                                    offset: Offset(1, 2))
+                              ],
+                            ),
+                            child: Center(
+                              child: Text("${day.day}",
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                          );
+                        },
+                        todayBuilder: (context, day, focusedDay) {
+                          final color = isSameDay(_selectedDay, day)
+                              ? Colors.blue
+                              : _getDayColor(day);
+                          return Container(
+                            margin: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: color,
+                              border:
+                              Border.all(color: Colors.black26, width: 2),
+                              shape: BoxShape.circle,
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 3,
+                                    offset: Offset(1, 2))
+                              ],
+                            ),
+                            child: Center(
+                              child: Text("${day.day}",
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  Row(
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Expanded(child: _buildLegendItem(Colors.green, "Available")),
-                      Expanded(child: _buildLegendItem(Colors.orange, "Partially Booked")),
+                      _buildLegendItem(Colors.green, "Available"),
+                      const SizedBox(width: 24),
+                      _buildLegendItem(Colors.red, "Booked"),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildLegendItem(Colors.red, "Fully Booked")),
-                      Expanded(child: _buildLegendItem(Colors.blue, "Selected")),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 32),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -483,8 +428,7 @@ class _HomePageState extends State<HomePage> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.black12, width: 1),
             boxShadow: const [
-              BoxShadow(
-                  color: Colors.black12, blurRadius: 2, offset: Offset(1, 1))
+              BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(1, 1))
             ],
           ),
         ),
